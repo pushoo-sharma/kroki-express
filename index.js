@@ -21,6 +21,46 @@ if (!fs.existsSync(imageDirectory)) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
+// Function to delete files older than 3 days
+const deleteOldImages = () => {
+  const now = Date.now();
+  const threeDaysInMs = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+
+  // Read all files in the directory
+  fs.readdir(imageDirectory, (err, files) => {
+    if (err) {
+      console.error('Error reading image directory', err);
+      return;
+    }
+
+    files.forEach(file => {
+      const filePath = path.join(imageDirectory, file);
+
+      // Get the file's stats, including creation time
+      fs.stat(filePath, (err, stats) => {
+        if (err) {
+          console.error('Error getting file stats', err);
+          return;
+        }
+
+        const fileAgeInMs = now - new Date(stats.mtime).getTime();
+
+        // If the file is older than 3 days, delete it
+        if (fileAgeInMs > threeDaysInMs) {
+          fs.unlink(filePath, (err) => {
+            if (err) {
+              console.error('Error deleting file', filePath, err);
+            } else {
+              console.log(`Deleted old file: ${filePath}`);
+            }
+          });
+        }
+      });
+    });
+  });
+};
+
 // POST endpoint to generate the diagram and save it as an SVG file
 app.post('/generate', async (req, res) => {
   const { diagram } = req.body;
@@ -47,6 +87,9 @@ app.post('/generate', async (req, res) => {
     // Construct a URL to access the stored image
     const imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
 
+    // delete older images
+    deleteOldImages()
+    
     // Send back the URL
     res.json({ url: imageUrl });
   } catch (error) {
